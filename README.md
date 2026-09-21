@@ -6,7 +6,7 @@
 
 ## 快速启动
 
-Node.js 22+，pnpm 11，PostgreSQL 14+。
+Node.js 22.x（至少 22.13），pnpm 11.11.0，PostgreSQL 14+。
 
 ```bash
 pnpm install

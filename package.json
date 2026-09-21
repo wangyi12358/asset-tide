@@ -21,7 +21,7 @@
     "test:benchmark": "tsx --test scripts/benchmark.ts"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": "22.x"
   },
   "dependencies": {
     "@heroui/react": "^3.2.5",
@@ -56,5 +56,5 @@
     "typescript": "^7.0.2",
     "better-sqlite3": "^13.0.3"
   },
-  "packageManager": "pnpm@11.12.0"
+  "packageManager": "pnpm@11.11.0"
 }

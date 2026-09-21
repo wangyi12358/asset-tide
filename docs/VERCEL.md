@@ -47,7 +47,7 @@ node --env-file=.env.neon --import tsx scripts/seed.ts
 
 ## 3. 创建 Vercel 项目
 
-将项目上传到自己的私有 Git 仓库，在 Vercel 导入并选择 Next.js。使用 Node.js 22.x；仓库的 `packageManager` 固定 pnpm 版本。保留框架默认输出目录，不要把输出目录设为 `.next/standalone`。
+将项目上传到自己的私有 Git 仓库，在 Vercel 导入并选择 Next.js。仓库固定 Node.js 22.x 和 pnpm 11.11.0（本机 Node.js 至少 22.13）。pnpm 11.12.0 的发布包损坏，不要切回该版本。安装命令保持平台默认，构建命令为 `pnpm build`。保留框架默认输出目录，不要把输出目录设为 `.next/standalone`。
 
 在 **Production** 环境中设置：
 

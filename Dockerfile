@@ -9,7 +9,7 @@ RUN mkdir -p /pg-client/bin /pg-client/lib \
 FROM node:22-bookworm AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable && corepack prepare pnpm@11.12.0 --activate
+RUN corepack enable && corepack prepare pnpm@11.11.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
