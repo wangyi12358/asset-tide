@@ -41,7 +41,6 @@ Caddy 自动申请并续期证书，证书保存在持久卷。应用仍是一�
 | BETTER_AUTH_SECRET              | 至少 32 字符，生成脚本默认随机生成；升级时保留，否则已有登录会话失效    |
 | COINGECKO_API_KEY               | 可选，CoinGecko Demo Key，用于加密货币行情和图标；免费方案可用但有额度  |
 | TWELVE_DATA_API_KEY             | 可选，股票检索和报价；覆盖范围取决于供应商权限                          |
-| TUSHARE_TOKEN                   | 可选，基金；需要相关接口权限                                            |
 | RESEND_API_KEY / MAIL_FROM      | 可选，密码重置邮件；注册无需邮箱验证                                    |
 | ENABLE_SCHEDULER                | 默认 true，负责行情刷新、快照及每日备份                                 |
 | POSTGRES_PASSWORD / POSTGRES_DB | 数据库密码与库名，默认库名 asset_atlas；生成脚本创建 URL 安全的随机密码 |

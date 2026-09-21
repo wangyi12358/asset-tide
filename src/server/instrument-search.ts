@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getDb, transaction } from "./db";
 import { DomainError } from "./ledger";
+import { fundList } from "./funds";
 import type {
   Instrument,
   InstrumentCandidate,
@@ -140,55 +141,22 @@ async function coins(q: string) {
   });
 }
 async function funds(q: string) {
-  if (!process.env.TUSHARE_TOKEN)
-    throw new Error("未配置 Tushare Token，基金在线搜索暂不可用");
   const all = await cached(
-    "fund:list",
-    async () => {
-      const raw = await json("https://api.tushare.pro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_name: "fund_basic",
-          token: process.env.TUSHARE_TOKEN,
-          params: { market: "O", status: "L" },
-          fields: "ts_code,name",
+    "fund:eastmoney:list",
+    async () =>
+      (await fundList()).map(({ code, name }) =>
+        candidate({
+          name,
+          symbol: code,
+          // Preserve the identity used by previously imported domestic funds.
+          providerId: `${code}.OF`,
+          type: "fund",
+          market: "中国公募",
+          currency: "CNY",
+          unit: "份",
+          source: "天天基金",
         }),
-      });
-      if (raw.code !== 0)
-        throw new Error(
-          "Tushare 基金搜索不可用，请检查 Token 和 fund_basic 权限",
-        );
-      const data = z
-        .object({
-          data: z.object({
-            fields: z.array(z.string()),
-            items: z.array(z.array(z.unknown())),
-          }),
-        })
-        .parse(raw).data;
-      const codeIndex = data.fields.indexOf("ts_code"),
-        nameIndex = data.fields.indexOf("name");
-      if (codeIndex < 0 || nameIndex < 0)
-        throw new Error("基金搜索返回格式异常");
-      return data.items.flatMap((row) => {
-        const code = row[codeIndex],
-          name = row[nameIndex];
-        if (typeof code !== "string" || typeof name !== "string") return [];
-        return [
-          candidate({
-            name,
-            symbol: code.split(".")[0],
-            providerId: code,
-            type: "fund",
-            market: "中国公募",
-            currency: "CNY",
-            unit: "份",
-            source: "Tushare",
-          }),
-        ];
-      });
-    },
+      ),
     24 * 3600_000,
   );
   const term = q.toLowerCase();

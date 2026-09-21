@@ -672,9 +672,7 @@ app.get("/system", async (c) =>
           ? "Twelve Data 已配置（标的搜索及其他股票报价）"
           : "Twelve Data 未配置 · 支持手动",
       ].join("；"),
-      funds: process.env.TUSHARE_TOKEN
-        ? "已配置，权限以实际请求为准"
-        : "未配置 · 支持手动",
+      funds: "天天基金 · 免费基金搜索及已公布净值，无需 Token",
       gold: "Gold API · 免费国际现货金价",
     },
   }),

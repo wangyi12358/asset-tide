@@ -70,9 +70,9 @@ ENABLE_SCHEDULER=true
 
 保存资产流水后会立即刷新对应持仓的行情和汇率，期初录入阶段也支持按需刷新；Docker 常驻模式还会定时刷新。行情失败不会回滚已保存的流水，页面会提示具体原因；完成初始化之前只更新估值，不生成基线快照。
 
-添加资产时，输入名称或代码会在 500ms 停顿后自动在线搜索，不再依赖预设股票或币种列表。股票由 Twelve Data 查询（美股、A 股、港股，保留交易所及 USD/CNY/HKD 币种），加密货币由 CoinGecko 查询，国内场外公募基金由 Tushare `fund_basic` 查询。基金搜索需要对应接口权限；股票能被搜到不代表账户拥有该市场的报价权限。名称匹配取决于供应商，查不到时可尝试准确代码或英文名称；港股五位代码如 `00700` 会转换为供应商使用的 `0700`。
+添加资产时，输入名称或代码会在 500ms 停顿后自动在线搜索，不再依赖预设股票或币种列表。股票由 Twelve Data 查询（美股、A 股、港股，保留交易所及 USD/CNY/HKD 币种），加密货币由 CoinGecko 查询，国内公募基金由天天基金公开目录查询，无需 Token。股票能被搜到不代表账户拥有该市场的报价权限。名称匹配取决于供应商，查不到时可尝试准确代码或英文名称；港股五位代码如 `00700` 会转换为供应商使用的 `0700`。
 
-搜索只返回候选结果，选择后才由服务端核对并登记标的，填写数量并保存后才生成持仓。已有持仓和私有手动标的继续可选，实物黄金可直接选择足金金条或创建自定义品种，按克记录重量后自动获取参考金价。服务端缓存搜索结果 5 分钟，基金目录缓存 24 小时，并对每位用户每分钟最多允许 30 次搜索/选择请求；接口失败与无匹配结果分别提示，支持重试。不同交易所的同名代码、不同 CoinGecko ID 的同名代币不会合并。
+搜索只返回候选结果，选择后才由服务端核对并登记标的，填写数量并保存后才生成持仓。已有持仓和私有手动标的继续可选，实物黄金可直接选择足金金条或创建自定义品种，按克记录重量后自动获取参考金价。服务端缓存搜索结果 5 分钟，基金目录缓存 24 小时，并对每位用户每分钟最多允许 30 次搜索/选择请求；接口失败与无匹配结果分别提示，支持重试。不同交易所的同名代码、不同 CoinGecko ID 的同名代币不会合并。天天基金使用网站公开数据端点，可能限流或调整格式；解析时不执行远程 JavaScript。净值采用已公布单位净值，不使用盘中估算或累计净值；货币基金的收益率不作为单位净值。原有基金代码兼容，无需迁移持仓。
 
 | 类型         | 实现                               | 本次验证                              |
 | ------------ | ---------------------------------- | ------------------------------------- |
@@ -81,11 +81,11 @@ ENABLE_SCHEDULER=true
 | 加密货币     | CoinGecko 唯一供应商 ID、独立报价  | Bitcoin/USD 含更新时间，实测 HTTP 200 |
 | 港股         | 配置长桥后优先 LongPort，否则 Twelve Data；校验标的、币种和报价时间 | 模拟行情回归测试，真实账户权限待验证 |
 | 其他股票     | Twelve Data，校验币种和有效时间    | 覆盖与额度以实际账户为准              |
-| 国内基金     | Tushare 已公布净值                 | 未提供 Token，权限待验证              |
+| 国内基金     | 天天基金已公布单位净值             | 免费，无需 Token；货币基金支持手动录价 |
 | 黄金         | Gold API 免费实时金价，按纯度/克/金衡盎司估值 | CNY 报价实测成功，自动刷新与异常回归测试 |
 | 自定义标的   | 用户私有标的与手动估值             | 不冒充自动行情覆盖                    |
 
-可选环境变量：`COINGECKO_API_KEY`、`TWELVE_DATA_API_KEY`、`TUSHARE_TOKEN`、`LONGPORT_APP_KEY`、`LONGPORT_APP_SECRET`、`LONGPORT_ACCESS_TOKEN`。密钥仅供服务端使用。
+可选环境变量：`COINGECKO_API_KEY`、`TWELVE_DATA_API_KEY`、`LONGPORT_APP_KEY`、`LONGPORT_APP_SECRET`、`LONGPORT_ACCESS_TOKEN`。密钥仅供服务端使用。
 
 ### 实物黄金自动报价
 
@@ -194,7 +194,8 @@ src/proxy.ts              安全传递原页面地址用于登录回跳
 - [Better Auth 邮箱与密码](https://better-auth.com/docs/authentication/email-password)
 - [Frankfurter 汇率接口](https://frankfurter.dev/)
 - [CoinGecko Simple Price](https://docs.coingecko.com/reference/simple-price)
-- [Tushare 公募基金净值](https://tushare.pro/document/2?doc_id=119)
+- [天天基金公开基金目录](https://fund.eastmoney.com/js/fundcode_search.js)
+- [天天基金净值数据示例](https://fund.eastmoney.com/pingzhongdata/000001.js)
 
 ## 共同资产与 AI 分析
 

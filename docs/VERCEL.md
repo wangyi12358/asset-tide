@@ -58,7 +58,7 @@ node --env-file=.env.neon --import tsx scripts/seed.ts
 | `BETTER_AUTH_SECRET`                                          | 至少 32 字符随机密钥；升级或迁移时保留                           |
 | `CRON_SECRET`                                                 | 独立的至少 32 字符随机密钥                                       |
 | `ENABLE_SCHEDULER`                                            | `false`                                                          |
-| `COINGECKO_API_KEY` / `TWELVE_DATA_API_KEY` / `TUSHARE_TOKEN` | 按需配置；行情供应商另有额度与权限                               |
+| `COINGECKO_API_KEY` / `TWELVE_DATA_API_KEY` | 按需配置；行情供应商另有额度与权限                               |
 | `RESEND_API_KEY` / `MAIL_FROM`                                | 可选，找回密码使用；未配置时仍可注册和登录                       |
 
 可分别运行两次 `openssl rand -hex 32` 生成不同的认证密钥和 Cron 密钥。不要使用 `NEXT_PUBLIC_` 前缀存放任何密钥。`DIRECT_URL` 仅在本机迁移和备份时使用，无需放入 Vercel；Vercel 自动提供 `VERCEL` 与 `VERCEL_ENV`。

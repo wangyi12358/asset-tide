@@ -7,7 +7,7 @@ process.env.BETTER_AUTH_SECRET =
   "search-integration-test-only-secret-12345678901234567890";
 process.env.TWELVE_DATA_API_KEY = "test-twelve-key";
 process.env.COINGECKO_API_KEY = "test-coin-key";
-process.env.TUSHARE_TOKEN = "test-fund-token";
+delete process.env.TUSHARE_TOKEN;
 
 test("online search: authenticated lookup, exchange identity, validated import, cache and partial failure", async () => {
   const { app } = await import("../src/server/api");
@@ -52,6 +52,8 @@ test("online search: authenticated lookup, exchange identity, validated import, 
   assert.equal((await call("/instruments/search?q=")).status, 400);
   const originalFetch = globalThis.fetch;
   let requests = 0;
+  let fundFailing = true;
+  let fundRequests = 0;
   const rows = [
     {
       symbol: "UNSEEDED",
@@ -114,12 +116,15 @@ test("online search: authenticated lookup, exchange identity, validated import, 
         ],
       });
     }
-    assert.equal(parsed.hostname, "api.tushare.pro");
-    assert.equal(JSON.parse(String(init?.body)).api_name, "fund_basic");
-    return Response.json({
-      code: 0,
-      data: { fields: ["name", "ts_code"], items: [["测试基金", "123456.OF"]] },
-    });
+    assert.equal(
+      parsed.href,
+      "https://fund.eastmoney.com/js/fundcode_search.js",
+    );
+    fundRequests++;
+    if (fundFailing) return new Response("", { status: 503 });
+    return new Response(
+      'var r = [["123456","CSJJ","测试基金","混合型","CESHIJIJIN"]];',
+    );
   };
   try {
     const db = getDb();
@@ -201,8 +206,46 @@ test("online search: authenticated lookup, exchange identity, validated import, 
       chosen.iconUrl,
     );
 
+    const failedFund = await searchInstruments({ q: "测试", type: "fund" });
+    assert.match(failedFund.warnings[0], /天天基金服务暂不可用/);
+    fundFailing = false;
     const funds = await searchInstruments({ q: "测试", type: "fund" });
     assert.equal(funds.items[0].providerId, "123456.OF");
+    assert.equal(funds.items[0].source, "天天基金");
+    await searchInstruments({ q: "123456", type: "fund" });
+    assert.equal(
+      fundRequests,
+      2,
+      "failed directory is retried; successful directory is cached",
+    );
+    await db.instrument.create({
+      data: {
+        id: "legacy-tushare-fund",
+        name: "测试基金",
+        symbol: "123456",
+        providerId: "123456.OF",
+        type: "fund",
+        market: "中国公募",
+        currency: "CNY",
+        unit: "份",
+        purity: "1",
+        quoteBasis: "unit",
+      },
+    });
+    const importedFund = await (
+      await call("/instruments/import", {
+        q: "测试",
+        type: "fund",
+        key: funds.items[0].key,
+      })
+    ).json();
+    assert.equal(
+      importedFund.id,
+      "legacy-tushare-fund",
+      "reuse existing Tushare instrument",
+    );
+    const system = await (await call("/system")).json();
+    assert.match(system.providers.funds, /天天基金/);
     const partial = await searchInstruments({ q: "failure", type: "all" });
     assert.equal(partial.warnings.length, 1);
     assert.ok(partial.items.some((i) => i.type === "crypto"));

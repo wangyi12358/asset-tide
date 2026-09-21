@@ -4,6 +4,7 @@ import { D, holdings, rebuildSnapshots, profile } from "./valuation";
 import type { Instrument } from "@/lib/types";
 import { isHongKongStock, longportQuote, longportStatus } from "./longport";
 import { goldQuote } from "./gold";
+import { fundQuote } from "./funds";
 const inflight = new Map<string, Promise<void>>();
 async function json(
   url: string,
@@ -82,7 +83,9 @@ async function refreshInstrument(i: Instrument) {
       !!last &&
       (i.type === "gold"
         ? last.source.startsWith("Gold API")
-        : useLongport === last.source.startsWith("长桥 LongPort"));
+        : i.type === "fund"
+          ? last.source.startsWith("天天基金")
+          : useLongport === last.source.startsWith("长桥 LongPort"));
     if (
       last &&
       sameProvider &&
@@ -172,47 +175,11 @@ async function refreshInstrument(i: Instrument) {
         new Date(data.timestamp * 1000).toISOString(),
         "Twelve Data",
       );
-    } else if (i.type === "fund" && i.providerId && process.env.TUSHARE_TOKEN) {
-      const data = z
-        .object({
-          code: z.number(),
-          data: z
-            .object({
-              fields: z.array(z.string()),
-              items: z.array(
-                z.array(z.union([z.string(), z.number(), z.null()])),
-              ),
-            })
-            .nullable(),
-        })
-        .parse(
-          await json("https://api.tushare.pro", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              api_name: "fund_nav",
-              token: process.env.TUSHARE_TOKEN,
-              params: { ts_code: i.providerId },
-              fields: "nav_date,unit_nav",
-            }),
-          }),
-        );
-      const rows = data.data;
-      if (data.code !== 0 || !rows?.items.length)
-        throw new Error("基金净值未返回");
-      const sorted = rows.items.sort((a, b) =>
-        String(b[rows.fields.indexOf("nav_date")]).localeCompare(
-          String(a[rows.fields.indexOf("nav_date")]),
-        ),
-      );
-      const row = sorted[0];
-      const date = String(row[rows.fields.indexOf("nav_date")]);
-      await storePrice(
-        i,
-        String(row[rows.fields.indexOf("unit_nav")]),
-        now(),
-        `Tushare 已公布净值 ${date}（采集时生效）`,
-      );
+    } else if (i.type === "fund" && i.providerId) {
+      if (i.currency !== "CNY")
+        throw new Error("天天基金自动净值仅支持人民币基金");
+      const quote = await fundQuote(i.providerId);
+      await storePrice(i, quote.value, quote.asOf, quote.source);
     } else throw new Error("此标的的自动行情未配置");
   });
 }
