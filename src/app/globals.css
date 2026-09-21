@@ -861,16 +861,25 @@ svg {
   height: 36px;
   border-radius: 9px;
   flex-shrink: 0;
+  overflow: hidden;
+  line-height: 1;
   background: #e8ecf3;
   color: #667795;
 }
 .asset-icon.stock {
-  background: #e7ebf3;
-  color: #506486;
+  background: #ebeff6;
+  color: var(--accent);
 }
-.asset-icon.stock b {
-  font-size: 19px;
-  font-weight: 500;
+.asset-icon > * {
+  grid-area: 1 / 1;
+}
+.asset-icon.cash {
+  background: #ebeff6;
+  color: var(--accent);
+}
+.currency-icon {
+  font-size: 16px;
+  font-weight: 600;
 }
 .asset-icon.gold {
   background: #f8f1e2;
@@ -882,7 +891,7 @@ svg {
 }
 .asset-icon.fund {
   background: #ebeff6;
-  color: #8396b3;
+  color: var(--accent);
 }
 .holding-quantity,
 .holding-price,
@@ -2882,8 +2891,8 @@ svg {
 
 /* Sharing and AI connections follow the same responsive blue workspace. */
 .asset-icon img {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   border-radius: 50%;
 }

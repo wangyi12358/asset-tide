@@ -4,7 +4,9 @@ import {
   AlertCircle,
   ArrowUpRight,
   ChartNoAxesCombined,
+  ChartPie,
   Coins,
+  Banknote,
 } from "lucide-react";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { coinIconUrl } from "@/lib/asset-icons";
@@ -102,24 +104,42 @@ export function AssetIcon({
   iconUrl?: string | null;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
-  if (type !== "crypto" && type !== "gold") return null;
+  const [loaded, setLoaded] = useState<string | null>(null);
   const src =
     type === "gold"
       ? "/icons/gold.svg"
-      : coinIconUrl(iconUrl) ||
-        (id ? `/api/instruments/${encodeURIComponent(id)}/icon` : null);
+      : type === "crypto"
+        ? coinIconUrl(iconUrl) ||
+          (id ? `/api/instruments/${encodeURIComponent(id)}/icon` : null)
+        : null;
+  const currencySymbol = (
+    { CNY: "¥", USD: "$", HKD: "HK$" } as Record<string, string>
+  )[symbol?.toUpperCase() || ""];
   return (
     <span className={`asset-icon ${type}`} aria-hidden="true">
-      {src && failed !== src ? (
+      {src && failed !== src && (
         <img
           src={src}
           alt=""
-          width={32}
-          height={32}
+          width={28}
+          height={28}
           loading="lazy"
           referrerPolicy="no-referrer"
+          style={{ visibility: loaded === src ? "visible" : "hidden" }}
+          onLoad={() => setLoaded(src)}
           onError={() => setFailed(src)}
         />
+      )}
+      {src && loaded === src && failed !== src ? null : type === "stock" ? (
+        <ChartNoAxesCombined size={22} strokeWidth={1.75} />
+      ) : type === "fund" ? (
+        <ChartPie size={22} strokeWidth={1.75} />
+      ) : type === "cash" ? (
+        currencySymbol ? (
+          <span className="currency-icon">{currencySymbol}</span>
+        ) : (
+          <Banknote size={22} strokeWidth={1.75} />
+        )
       ) : type === "gold" ? (
         <Coins size={22} />
       ) : (
