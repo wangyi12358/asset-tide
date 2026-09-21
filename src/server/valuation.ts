@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 import { getDb, now, uid, transaction } from "./db";
+import { defaultInstruments } from "./catalog";
 import type {
   Holding,
   Instrument,
@@ -56,10 +57,25 @@ export async function profile(userId: string) {
   })) as Profile;
 }
 export async function instruments(userId: string) {
-  return (await getDb().instrument.findMany({
-    where: { OR: [{ ownerId: null }, { ownerId: userId }] },
-    orderBy: [{ type: "asc" }, { name: "asc" }],
-  })) as Instrument[];
+  const read = () =>
+    getDb().instrument.findMany({
+      where: { OR: [{ ownerId: null }, { ownerId: userId }] },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+    });
+  let items = await read();
+  const missing = defaultInstruments.filter(
+    (cash) => !items.some((item) => item.id === cash.id),
+  );
+  if (missing.length) {
+    // New databases may have migrations but no seed. Concurrent instances can
+    // repair the same missing rows without overwriting existing instruments.
+    await getDb().instrument.createMany({
+      data: missing,
+      skipDuplicates: true,
+    });
+    items = await read();
+  }
+  return items as Instrument[];
 }
 export async function wallets(userId: string) {
   await ensureProfile(userId);
@@ -243,7 +259,10 @@ export async function holdings(userId: string, at = now()): Promise<Holding[]> {
       : Infinity;
     const stale =
       (i.type !== "cash" &&
-        age > (i.type === "crypto" ? 3600_000 : 4 * 86400_000)) ||
+        age >
+          (i.type === "crypto" || i.type === "gold"
+            ? 3600_000
+            : 4 * 86400_000)) ||
       (fx &&
         i.currency !== "CNY" &&
         new Date(at).getTime() - new Date(fx.asOf).getTime() > 5 * 86400_000);

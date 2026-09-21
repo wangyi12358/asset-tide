@@ -2,8 +2,14 @@ import { z } from "zod";
 import { getDb, now, uid, transaction } from "./db";
 import { D, holdings, rebuildSnapshots, profile } from "./valuation";
 import type { Instrument } from "@/lib/types";
+import { isHongKongStock, longportQuote, longportStatus } from "./longport";
+import { goldQuote } from "./gold";
 const inflight = new Map<string, Promise<void>>();
-async function json(url: string, init?: RequestInit): Promise<unknown> {
+async function json(
+  url: string,
+  init?: RequestInit,
+  acceptProviderError = false,
+): Promise<unknown> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await fetch(url, {
@@ -11,6 +17,13 @@ async function json(url: string, init?: RequestInit): Promise<unknown> {
         signal: AbortSignal.timeout(8000),
       });
       if (!r.ok) {
+        // Twelve Data uses HTTP 404 for plan restrictions as well as missing symbols.
+        // Preserve the structured error so the caller can distinguish those cases.
+        if (acceptProviderError && r.status >= 400 && r.status < 500) {
+          const body: unknown = await r.json().catch(() => null);
+          if (z.object({ status: z.literal("error") }).safeParse(body).success)
+            return body;
+        }
         if (r.status !== 429 && r.status < 500)
           throw new Error("行情请求不可用");
         throw new Error("行情服务暂不可用");
@@ -38,7 +51,13 @@ async function storePrice(
     throw new Error("报价不合法");
   if (
     !(await getDb().price.findFirst({
-      where: { instrumentId: i.id, asOf: asOf, userId: null, value: value },
+      where: {
+        instrumentId: i.id,
+        asOf: asOf,
+        userId: null,
+        value: value,
+        source,
+      },
     }))
   )
     await getDb().price.create({
@@ -54,12 +73,30 @@ async function storePrice(
 }
 async function refreshInstrument(i: Instrument) {
   await shared(i.id, async () => {
+    const useLongport = isHongKongStock(i) && longportStatus() !== "disabled";
     const last = (await getDb().price.findFirst({
       where: { instrumentId: i.id, userId: null },
       orderBy: { createdAt: "desc" },
-    })) as { createdAt: string } | undefined;
-    if (last && Date.now() - Date.parse(last.createdAt) < 15 * 60_000) return;
-    if (i.type === "crypto" && i.providerId) {
+    })) as { createdAt: string; source: string } | undefined;
+    const sameProvider =
+      !!last &&
+      (i.type === "gold"
+        ? last.source.startsWith("Gold API")
+        : useLongport === last.source.startsWith("长桥 LongPort"));
+    if (
+      last &&
+      sameProvider &&
+      Date.now() - Date.parse(last.createdAt) <
+        (i.type === "gold" ? 60_000 : 15 * 60_000)
+    )
+      return;
+    if (i.type === "gold") {
+      const quote = await goldQuote(i);
+      await storePrice(i, quote.value, quote.asOf, quote.source);
+    } else if (useLongport) {
+      const quote = await longportQuote(i);
+      await storePrice(i, quote.value, quote.asOf, quote.source);
+    } else if (i.type === "crypto" && i.providerId) {
       const data = z
         .record(
           z.string(),
@@ -93,11 +130,24 @@ async function refreshInstrument(i: Instrument) {
     ) {
       const raw = await json(
         `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(i.providerId)}&apikey=${encodeURIComponent(process.env.TWELVE_DATA_API_KEY)}`,
+        undefined,
+        true,
       );
       const failure = z
-        .object({ status: z.literal("error"), code: z.number().optional() })
+        .object({
+          status: z.literal("error"),
+          code: z.number().optional(),
+          message: z.string().optional(),
+        })
         .safeParse(raw);
       if (failure.success) {
+        const requiredPlan = failure.data.message?.match(
+          /starting with the (Grow|Pro|Ultra)(?: or (Venture|Enterprise))? plan/i,
+        );
+        if (requiredPlan)
+          throw new Error(
+            `Twelve Data 此标的需 ${requiredPlan[1]}${requiredPlan[2] ? ` 或 ${requiredPlan[2]}` : ""} 套餐，当前 Key 无报价权限`,
+          );
         const messages: Record<number, string> = {
           401: "Twelve Data 密钥无效，请检查配置",
           403: "Twelve Data 账户未开通此市场的报价权限",
@@ -163,10 +213,7 @@ async function refreshInstrument(i: Instrument) {
         now(),
         `Tushare 已公布净值 ${date}（采集时生效）`,
       );
-    } else
-      throw new Error(
-        i.type === "gold" ? "此黄金品种需手动参考价" : "此标的的自动行情未配置",
-      );
+    } else throw new Error("此标的的自动行情未配置");
   });
 }
 export async function refreshMarket(userId: string, instrumentId?: string) {

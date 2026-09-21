@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import {
   LayoutDashboard,
   Wallet,
@@ -86,8 +86,12 @@ export function Workspace({
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
   const portfolio = demo ? demoPortfolio : data;
-  // One request when opening the workspace or returning to the tab.
-  // The server enforces a shared 15-minute cooldown; no background polling.
+  const { mutate: mutateCache } = useSWRConfig();
+  const hasGold = !!portfolio?.holdings.some(
+    (h) => h.type === "gold" && h.unit === "克" && Number(h.quantity) > 0,
+  );
+  // Gold refreshes every minute while visible; other portfolios refresh on focus.
+  // The server shares the cooldown across tabs and instances.
   useEffect(() => {
     if (demo) return;
     let active = true;
@@ -102,6 +106,10 @@ export function Workspace({
         );
         if (active) {
           await mutate();
+          if (!result.skipped)
+            await mutateCache(
+              (key) => typeof key === "string" && key.startsWith("/assets/"),
+            );
           if (active && result.warnings.length)
             setMessage(result.warnings.join("；"));
         }
@@ -116,11 +124,15 @@ export function Workspace({
     }
     void refreshIfNeeded();
     document.addEventListener("visibilitychange", refreshIfNeeded);
+    const timer = hasGold
+      ? window.setInterval(() => void refreshIfNeeded(), 60_000)
+      : undefined;
     return () => {
+      if (timer !== undefined) window.clearInterval(timer);
       active = false;
       document.removeEventListener("visibilitychange", refreshIfNeeded);
     };
-  }, [demo, mutate]);
+  }, [demo, hasGold, mutate, mutateCache]);
   useEffect(() => {
     setHidden(localStorage.getItem("atlas-hide-amounts") === "true");
   }, []);

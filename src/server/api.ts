@@ -42,6 +42,7 @@ import {
   voidEvent,
 } from "./ledger";
 import { refreshMarket } from "./market";
+import { longportStatus } from "./longport";
 import { refreshOnDemand } from "./refresh";
 import { schedulerEnabled } from "./runtime";
 import { changeHolding, holdingChangeSchema } from "./holding-mutations";
@@ -661,13 +662,20 @@ app.get("/system", async (c) =>
     providers: {
       fx: "Frankfurter",
       crypto: "CoinGecko",
-      stocks: process.env.TWELVE_DATA_API_KEY
-        ? "已配置，覆盖以实际请求为准"
-        : "未配置 · 支持手动",
+      stocks: [
+        longportStatus() === "ready"
+          ? "港股：长桥已配置，权限以实际请求为准"
+          : longportStatus() === "incomplete"
+            ? "港股：长桥凭证不完整"
+            : "港股：跟随 Twelve Data 配置",
+        process.env.TWELVE_DATA_API_KEY
+          ? "Twelve Data 已配置（标的搜索及其他股票报价）"
+          : "Twelve Data 未配置 · 支持手动",
+      ].join("；"),
       funds: process.env.TUSHARE_TOKEN
         ? "已配置，权限以实际请求为准"
         : "未配置 · 支持手动",
-      gold: "手动参考金属价值",
+      gold: "Gold API · 免费国际现货金价",
     },
   }),
 );

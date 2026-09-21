@@ -110,3 +110,10 @@ export const catalog: Instrument[] = [
   purity: type === "gold" ? "0.9999" : "1",
   quoteBasis: "unit",
 })) as Instrument[];
+
+// These currencies are required for cash entry and settlement even without seed.
+export const cashInstruments = catalog.filter((item) => item.type === "cash");
+// Physical gold is selectable even on migrated databases that were not seeded.
+export const defaultInstruments = catalog.filter(
+  (item) => item.type === "cash" || item.type === "gold",
+);

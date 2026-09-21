@@ -11,8 +11,11 @@ process.env.BETTER_AUTH_URL = "http://localhost:3000";
 process.env.BETTER_AUTH_SECRET =
   "quote-refresh-tests-only-secret-12345678901234567890";
 process.env.TWELVE_DATA_API_KEY = "test-key";
+delete process.env.LONGPORT_APP_KEY;
+delete process.env.LONGPORT_APP_SECRET;
+delete process.env.LONGPORT_ACCESS_TOKEN;
 
-test("opening assets get quotes immediately; failed quotes keep a single saved record and scheduler retries before initialization", async () => {
+test("opening assets get quotes immediately; failed quotes keep a single saved record and scheduler retries before initialization", async (t) => {
   const { app } = await import("../src/server/api");
   const { getDb } = await import("../src/server/db");
   const { tick } = await import("../src/server/jobs");
@@ -56,6 +59,16 @@ test("opening assets get quotes immediately; failed quotes keep a single saved r
     assert.equal(parsed.hostname, "api.twelvedata.com");
     const symbol = parsed.searchParams.get("symbol")!;
     requested.push(symbol);
+    if (symbol === "9988:HKEX")
+      return Response.json(
+        {
+          status: "error",
+          code: 404,
+          message:
+            "This symbol is available starting with the Pro or Venture plan. Consider upgrading now at https://twelvedata.com/pricing",
+        },
+        { status: 404 },
+      );
     if (symbol === "MSFT" && fail)
       return Response.json({ status: "error", code: 429, message: "quota" });
     return Response.json({
@@ -140,7 +153,92 @@ test("opening assets get quotes immediately; failed quotes keep a single saved r
       0,
       "quotes do not finalize the baseline or create pre-baseline snapshots",
     );
+    await getDb().instrument.create({
+      data: {
+        id: "test-hk-alibaba",
+        name: "Alibaba Hong Kong",
+        symbol: "9988",
+        type: "stock",
+        market: "HKEX",
+        currency: "HKD",
+        unit: "股",
+        providerId: "9988:HKEX",
+      },
+    });
+    const hk = await post(
+      { ...input, instrumentId: "test-hk-alibaba" },
+      crypto.randomUUID(),
+    );
+    assert.equal(hk.status, 201, "quote permissions must not lose the holding");
+    const hkResult = await hk.json();
+    assert.match(
+      hkResult.market.warnings[0],
+      /Pro 或 Venture 套餐.*无报价权限/,
+    );
+    assert.doesNotMatch(hkResult.market.warnings[0], /未找到|test-key/);
+    assert.equal(
+      requested.filter((s) => s === "9988:HKEX").length,
+      1,
+      "do not retry permanent plan restrictions",
+    );
+    assert.equal(
+      await getDb().price.count({ where: { instrumentId: "test-hk-alibaba" } }),
+      0,
+    );
+    assert.equal(
+      (await holdings(user)).find((h) => h.id === "test-hk-alibaba")?.price,
+      null,
+    );
+    const { longportSdk } = await import("../src/server/longport-sdk");
+    const { refreshMarket } = await import("../src/server/market");
+    const quoteTime = new Date(Date.now() - 15 * 60_000);
+    let longportRequests = 0;
+    t.mock.method(
+      longportSdk,
+      "create",
+      async () =>
+        ({
+          quote: async (symbols: string[]) => {
+            assert.deepEqual(symbols, ["9988.HK"]);
+            longportRequests++;
+            return [
+              {
+                symbol: "9988.HK",
+                lastDone: { toString: () => "125" },
+                timestamp: quoteTime,
+              },
+            ];
+          },
+          staticInfo: async () => [{ symbol: "9988.HK", currency: "HKD" }],
+        }) as unknown as import("longport").QuoteContext,
+    );
+    process.env.LONGPORT_APP_KEY = "hk-test-app";
+    process.env.LONGPORT_APP_SECRET = "hk-test-secret";
+    process.env.LONGPORT_ACCESS_TOKEN = "hk-test-token";
+    assert.deepEqual(
+      (await refreshMarket(user, "test-hk-alibaba")).warnings,
+      [],
+    );
+    const pricedHk = (await holdings(user)).find(
+      (h) => h.id === "test-hk-alibaba",
+    )!;
+    assert.equal(pricedHk.price, "125");
+    assert.equal(pricedHk.originalValue, "250");
+    assert.equal(pricedHk.value, "1750");
+    assert.equal(pricedHk.currency, "HKD");
+    assert.equal(pricedHk.priceAsOf, quoteTime.toISOString());
+    assert.match(pricedHk.source, /长桥 LongPort/);
+    await refreshMarket(user, "test-hk-alibaba");
+    assert.equal(longportRequests, 1, "reuse cached quote within 15 minutes");
+    assert.equal(
+      requested.filter((s) => s === "9988:HKEX").length,
+      1,
+      "configured HK quotes must bypass Twelve Data",
+    );
   } finally {
+    delete process.env.LONGPORT_APP_KEY;
+    delete process.env.LONGPORT_APP_SECRET;
+    delete process.env.LONGPORT_ACCESS_TOKEN;
     globalThis.fetch = originalFetch;
     rmSync(backupDir, { recursive: true, force: true });
   }

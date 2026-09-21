@@ -4,7 +4,7 @@
 
 私有接口使用 Better Auth Cookie。服务端从会话获取用户 ID，不接受调用者指定用户身份。写入请求须带 `Content-Type: application/json`、匹配 `BETTER_AUTH_URL` 的 `Origin`、长度 8–100 的 `Idempotency-Key`。同键同请求重放返回相同结果，不同请求返回 409。金额和数量传十进制字符串，时间用 UTC ISO 8601。
 
-`POST /api/refresh` 是限频刷新例外，不存幂等响应。请求体 `{mode:"auto"}` 使用数据库共享的 15 分钟冷却窗口，跳过时返回 200 `{skipped:true,warnings:[]}`；`{}` 或 `{mode:"manual"}` 为手动刷新，60 秒内重复返回 429。两种模式共用最近尝试时间，失败也保留冷却。成功执行返回 `{skipped:false,warnings,updatedAt}`。仍须登录、同源 Origin 和 JSON。
+`POST /api/refresh` 是限频刷新例外，不存幂等响应。请求体 `{mode:"auto"}` 使用数据库共享的 15 分钟冷却窗口（有可自动报价的实物黄金持仓时为 60 秒），跳过时返回 200 `{skipped:true,warnings:[]}`；`{}` 或 `{mode:"manual"}` 为手动刷新，60 秒内重复返回 429。两种模式共用最近尝试时间，失败也保留冷却。成功执行返回 `{skipped:false,warnings,updatedAt}`。仍须登录、同源 Origin 和 JSON。
 
 `GET /api/cron/daily` 使用独立 `Authorization: Bearer <CRON_SECRET>`，不使用用户 Cookie、Origin 或幂等键。仅计算每日快照和清理过期限流/验证记录，不刷新行情、不写本地备份。未配置密钥或密钥错误返回 401，Vercel Preview 返回 403，HEAD 返回 405。完成返回 200 `{created,pending:false,boundary}`；有待补跑记录返回 503 `{created,pending:true,boundary}`，再次执行从已提交快照继续；失败返回 500。响应均不缓存。
 

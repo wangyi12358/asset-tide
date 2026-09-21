@@ -288,7 +288,7 @@ export function SettingsPage() {
               fx: "Frankfurter",
               crypto: "CoinGecko",
               stocks: "按供应商覆盖获取",
-              gold: "手动参考金属价值",
+              gold: "Gold API · 免费国际现货金价",
             },
           ).map(([key, value]) => (
             <div key={key}>
@@ -309,8 +309,9 @@ export function SettingsPage() {
         </div>
         {system?.scheduleMode === "on-demand" && (
           <p className="system-job">
-            打开页面或返回标签页时按需更新行情，自动更新间隔至少 15
-            分钟；无人访问时不持续采集。每日快照可能延迟生成，缺少历史报价时保留缺口。
+            打开页面或返回标签页时按需更新行情；持有实物黄金时，页面可见期间每分钟尝试更新，其余行情缓存
+            15
+            分钟。无人访问时不持续采集。每日快照可能延迟生成，缺少历史报价时保留缺口。
           </p>
         )}
         {system?.backupMode === "local" && (

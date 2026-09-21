@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["longport"],
   poweredByHeader: false,
   devIndicators: false,
   logging: false,

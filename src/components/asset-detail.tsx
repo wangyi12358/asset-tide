@@ -134,7 +134,7 @@ export function AssetDetail({ id }: { id: string }) {
           <strong>¥ {amount(h.value)}</strong>
           <p>
             {h.type === "gold"
-              ? "参考金属价值，不含回收折价或首饰工费"
+              ? "按含金重量估值；自动价采用国际现货黄金，不含金店溢价、回收折价或工费"
               : "根据持有数量、价格及原币兑人民币汇率计算"}
           </p>
         </section>

@@ -28,10 +28,12 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const edit = params.get("edit");
-  const { data: instruments, mutate } = useSWR<Instrument[]>(
-    demo ? null : "/instruments",
-    api,
-  );
+  const {
+    data: instruments,
+    mutate,
+    error: instrumentsError,
+    isLoading: instrumentsLoading,
+  } = useSWR<Instrument[]>(demo ? null : "/instruments", api);
   const { data: old } = useSWR<LedgerEvent>(
     !demo && edit ? `/transactions/${edit}` : null,
     api,
@@ -292,6 +294,8 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
               onChange={(e) => {
                 const next = e.target.value;
                 setFilter(next);
+                setSearch("");
+                setDebouncedSearch("");
                 setError("");
                 if (item && next !== "all" && item.type !== next)
                   selectInstrument("");
@@ -313,7 +317,7 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
               hint={
                 canSearchOnline
                   ? "输入后自动查询；请在下方按市场和币种选择具体标的。"
-                  : "现金可直接选择币种；实物黄金可创建手动报价标的。"
+                  : "现金可直接选择币种；实物黄金按国际现货金价自动估值，也可创建自定义品种。"
               }
               onChange={(e) => {
                 const next = e.target.value;
@@ -359,15 +363,27 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
                 </button>
               </Notice>
             )}
+          {instrumentsError && (
+            <Notice tone="error">
+              资产标的加载失败：{(instrumentsError as Error).message}
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => void mutate()}
+              >
+                重新加载
+              </button>
+            </Notice>
+          )}
           <SelectField
             label="资产标的"
             required
             value={instrumentId}
-            disabled={importing}
+            disabled={importing || instrumentsLoading || !!instrumentsError}
             onChange={(e) => void chooseInstrument(e.target.value)}
           >
             <option value="" disabled>
-              请选择资产
+              {instrumentsLoading ? "正在加载资产标的…" : "请选择资产"}
             </option>
             {!!filtered?.length && (
               <optgroup label="已选 / 已有资产与手动标的">
@@ -592,8 +608,8 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
           {item?.type === "gold" && (
             <Notice>
               纯度 {Number(item.purity) * 100}%，按
-              {item.quoteBasis === "oz" ? "美元/金衡盎司" : "原币/克"}
-              折算参考金属价值。
+              {item.currency}/{item.quoteBasis === "oz" ? "金衡盎司" : "克"}
+              折算参考金属价值。自动价采用国际现货黄金，不含金店溢价、回收折价或工费。
             </Notice>
           )}
         </aside>
