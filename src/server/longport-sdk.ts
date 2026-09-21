@@ -3,7 +3,10 @@ export const longportSdk = {
   async create(appKey: string, appSecret: string, accessToken: string) {
     const { Config, QuoteContext } = await import("longport");
     return QuoteContext.new(
-      Config.fromApikey(appKey, appSecret, accessToken, {
+      new Config({
+        appKey,
+        appSecret,
+        accessToken,
         enablePrintQuotePackages: false,
       }),
     );

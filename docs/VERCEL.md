@@ -67,6 +67,10 @@ node --env-file=.env.neon --import tsx scripts/seed.ts
 
 ## 4. 验证上线
 
+LongPort 固定为 `2.1.12`，其 Linux x64 原生库约 8.7 MiB、最高依赖 GLIBC 2.34，已验证原生库加载、配置创建及报价接口存在。不要直接升级到 `4.3.7`：该版本原生库约 543 MiB，且要求 GLIBC 2.39，会导致 Vercel 函数超限或加载失败。Vercel 构建还会移除进程内定时任务的依赖，避免它们进入 Middleware。后续升级 SDK 前需重新验证 Linux 兼容性和函数大小。
+
+若出现 Node.js 24.x 被 22.x 覆盖的警告，把 Vercel Project Settings 中的 Node.js Version 改为 22.x，与 `package.json` 一致即可；该警告本身不会导致构建失败。
+
 1. `/api/health` 返回 `status: ok`；注册测试账户、添加一笔资产，确认登录和保存正常。
 2. 打开总览，检查自动刷新及手动刷新；报价失败时应保留账本并显示原因。
 3. 在 Vercel 的 Cron Jobs 页面确认每日任务存在，手动执行一次，预期 HTTP 200。直接在浏览器访问 `/api/cron/daily` 应返回 401。

@@ -36,8 +36,8 @@ importers:
         specifier: ^4.13.8
         version: 4.13.8
       longport:
-        specifier: ^4.3.7
-        version: 4.3.7
+        specifier: 2.1.12
+        version: 2.1.12
       lucide-react:
         specifier: ^1.47.0
         version: 1.47.0(react@19.3.0)
@@ -1933,40 +1933,47 @@ packages:
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
 
-  longport-darwin-arm64@4.3.7:
-    resolution: {integrity: sha512-fXXIqUgfW0xo9GKTIc6Gk4wsl26oMV2TW6otj5VRRfYP0eL4E+ptqCEnC1AxICtdu7LH0gBYUP48ZUsG7sm7HA==}
+  longport-darwin-arm64@2.1.12:
+    resolution: {integrity: sha512-CWJCZ0hLj6s+lJHY+R2i0FxhnSH4lVs+OynhlyeQSemB25AB2geAnj7NGlHIZd0uaNzJAf5ouKjE2NDBgMIkXg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  longport-darwin-x64@4.3.7:
-    resolution: {integrity: sha512-/y/ft9Nhlpd83Z0sV4AFgreZlGvbZBA3jYGDwhE8H8/tpl2LxZx9RQVQz7lfwmraLb2BxE4QOHwdYnPVtLzQJQ==}
+  longport-darwin-x64@2.1.12:
+    resolution: {integrity: sha512-4wXxzi6UFH63FMzttrLYPdXfC/757eDHNEF081psI7bATx7rmg8O+6TdNjvqf1vGdQm4+XNHg4qTuA7AE83qJw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  longport-linux-arm64-gnu@4.3.7:
-    resolution: {integrity: sha512-pMssv1DcG5iBWuaMqfKecBHOPh5FMN6GtXOkqMXoIoDCirgurxQgwr+Iip2xRVt5NmU5qiNO/fx5mi01L4Lvrg==}
+  longport-linux-arm64-gnu@2.1.12:
+    resolution: {integrity: sha512-HgzZqHFQdTY7m2lx2loVDQALgFb/G7UemrcjtaWkAGbU7tDzHiAKgouPXxf+jvibUkoLV3fXuM5kCbczXtEtQA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  longport-linux-x64-gnu@4.3.7:
-    resolution: {integrity: sha512-Yu+vJ7Vb7M2om/toPIqCmHG9piLsguxvw2y9d1w0z6pHqJs/2gsen1tQ4CuOc4Sf4xM8wmIasG/mPa9OsJ3Omg==}
+  longport-linux-x64-gnu@2.1.12:
+    resolution: {integrity: sha512-E+E5IyUE2Q1INuSD2o0bvB4vNE8mnFzHwGRX7owOOIpJ06JEaW20rkam9EaegnDR3Cf27DsEdZ7B/D6+tqKihw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  longport-win32-x64-msvc@4.3.7:
-    resolution: {integrity: sha512-vC86bAj2oN58jGoTntSpOhu6lhQ7k/ckwFxa+hGHVpAV3xMpksebX1QY5i+Fl95p7wrBTiXszTgEPbYNPcMVYA==}
+  longport-linux-x64-musl@2.1.12:
+    resolution: {integrity: sha512-uptJBAksNO8m+4b+VsTv0yZYPakUPW9WIvU8tmpvBw7S7ZdHvCUfQbFPj0HKl2HAbic+1ybHQE4P0QqQ3SI97g==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  longport-win32-x64-msvc@2.1.12:
+    resolution: {integrity: sha512-6280HVYY+r/2QM/ODbGaMGEbhqR/LxywlKIF15lJWHBgrgPQA7wsF4SBzXv+OS25KuRnRv8pBxULongahrcRew==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
 
-  longport@4.3.7:
-    resolution: {integrity: sha512-frvJoeKBqNW3/tsBRzDDLHjrA1RG/fGC8Gk9ev91R/RMIm+91CHvqVGahtFYinXHSsIruveY5aqhs0THTov6Ew==}
+  longport@2.1.12:
+    resolution: {integrity: sha512-Mrr/UsxNuJRfPRsfiBLKKx4thpePsQ5RcWryn6QXiyVZznwyI+MZOIKCD2HeV5eljfMaVKtSms3//DZmVsowFg==}
     engines: {node: '>= 10'}
 
   loose-envify@1.4.0:
@@ -4145,28 +4152,32 @@ snapshots:
 
   long@5.3.2: {}
 
-  longport-darwin-arm64@4.3.7:
+  longport-darwin-arm64@2.1.12:
     optional: true
 
-  longport-darwin-x64@4.3.7:
+  longport-darwin-x64@2.1.12:
     optional: true
 
-  longport-linux-arm64-gnu@4.3.7:
+  longport-linux-arm64-gnu@2.1.12:
     optional: true
 
-  longport-linux-x64-gnu@4.3.7:
+  longport-linux-x64-gnu@2.1.12:
     optional: true
 
-  longport-win32-x64-msvc@4.3.7:
+  longport-linux-x64-musl@2.1.12:
     optional: true
 
-  longport@4.3.7:
+  longport-win32-x64-msvc@2.1.12:
+    optional: true
+
+  longport@2.1.12:
     optionalDependencies:
-      longport-darwin-arm64: 4.3.7
-      longport-darwin-x64: 4.3.7
-      longport-linux-arm64-gnu: 4.3.7
-      longport-linux-x64-gnu: 4.3.7
-      longport-win32-x64-msvc: 4.3.7
+      longport-darwin-arm64: 2.1.12
+      longport-darwin-x64: 2.1.12
+      longport-linux-arm64-gnu: 2.1.12
+      longport-linux-x64-gnu: 2.1.12
+      longport-linux-x64-musl: 2.1.12
+      longport-win32-x64-msvc: 2.1.12
 
   loose-envify@1.4.0:
     dependencies:
