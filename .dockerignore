@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env*
+data
+backups
+docs/screenshots
+test-results
+
+playwright-report
+*.tsbuildinfo
+.codex
+.agents
+
+src/generated/prisma

@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+.next/
+.vercel/
+.env*
+!.env.example
+!.env.docker.example
+data/
+backups/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.DS_Store
+
+src/generated/prisma/

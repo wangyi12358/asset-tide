@@ -1,0 +1,66 @@
+name: asset-atlas
+services:
+  db:
+    image: postgres:15-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run node scripts/docker-init.mjs}
+      POSTGRES_DB: ${POSTGRES_DB:-asset_atlas}
+    volumes:
+      - atlas-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  migrate:
+    build:
+      context: .
+      target: migrate
+    image: asset-atlas:migrate
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-asset_atlas}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+  app:
+    build:
+      context: .
+      target: runtime
+    image: asset-atlas:local
+    init: true
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Run node scripts/docker-init.mjs then use --env-file .env.docker}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-asset_atlas}
+      BACKUP_PATH: /app/backups
+      ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-true}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+    volumes:
+      - atlas-backups:/app/backups
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  atlas-postgres:
+  atlas-backups:

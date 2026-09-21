@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@index([lastRequest])
+  @@map("rate_limit")
+}
+
+model User {
+  id                  String        @id
+  name                String
+  email               String        @unique
+  emailVerified       Boolean       @default(false)
+  image               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  sessions            Session[]
+  accounts            Account[]
+  wallets             Wallet[]
+  instruments         Instrument[]
+  events              LedgerEvent[]
+  prices              Price[]
+  fxRates             FxRate[]
+  profile             Profile?
+  snapshots           Snapshot[]
+  invitations         AssetShare[]  @relation("Inviter")
+  receivedInvitations AssetShare[]  @relation("Invitee")
+  shareWallets        ShareWallet[]
+  mcpTokens           McpToken[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Wallet {
+  id       String        @id
+  userId   String
+  user     User          @relation(fields: [userId], references: [id])
+  name     String
+  type     String
+  archived Int           @default(0)
+  legs     Leg[]
+  grants   ShareWallet[]
+
+  @@unique([userId, name])
+  @@map("wallets")
+}
+
+model Instrument {
+  id         String  @id
+  ownerId    String?
+  owner      User?   @relation(fields: [ownerId], references: [id])
+  name       String
+  symbol     String
+  type       String
+  market     String
+  currency   String
+  unit       String
+  providerId String?
+  purity     String  @default("1")
+  quoteBasis String  @default("unit")
+  iconUrl    String?
+  legs       Leg[]
+  prices     Price[]
+
+  @@index([ownerId])
+  @@map("instruments")
+}
+
+model LedgerEvent {
+  id                 String   @id
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  type               String
+  occurredAt         String
+  createdAt          String
+  note               String
+  externalCny        String   @default("0")
+  baselineAdjustment String   @default("0")
+  status             String   @default("active")
+  idempotencyKey     String
+  payload            String
+  legs               Leg[]
+  prices             Price[]
+  fxRates            FxRate[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, occurredAt])
+  @@map("ledger")
+}
+
+model Leg {
+  id           String      @id
+  eventId      String
+  event        LedgerEvent @relation(fields: [eventId], references: [id])
+  accountId    String
+  account      Wallet      @relation(fields: [accountId], references: [id])
+  instrumentId String
+  instrument   Instrument  @relation(fields: [instrumentId], references: [id])
+  quantity     String
+  position     Int         @default(0)
+
+  @@index([eventId])
+  @@map("legs")
+}
+
+model Price {
+  id           String       @id
+  instrumentId String
+  instrument   Instrument   @relation(fields: [instrumentId], references: [id])
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id])
+  value        String
+  asOf         String
+  source       String
+  manual       Int          @default(0)
+  active       Int          @default(1)
+  endedAt      String?
+  eventId      String?
+  event        LedgerEvent? @relation(fields: [eventId], references: [id])
+  createdAt    String
+
+  @@index([instrumentId, userId, asOf])
+  @@map("prices")
+}
+
+model FxRate {
+  id       String       @id
+  sequence Int          @unique @default(autoincrement())
+  currency String
+  userId   String?
+  user     User?        @relation(fields: [userId], references: [id])
+  value    String
+  asOf     String
+  source   String
+  eventId  String?
+  event    LedgerEvent? @relation(fields: [eventId], references: [id])
+
+  @@index([currency, userId, asOf])
+  @@map("fx_rates")
+}
+
+model Profile {
+  userId      String  @id
+  user        User    @relation(fields: [userId], references: [id])
+  baseline    String?
+  baselineAt  String?
+  initialized Int     @default(0)
+  lastRefresh String?
+
+  @@map("profiles")
+}
+
+model Snapshot {
+  id       String  @id
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+  asOf     String
+  total    String
+  netFlow  String
+  pnl      String?
+  complete Int
+  version  Int     @default(1)
+  items    String
+
+  @@unique([userId, asOf])
+  @@map("snapshots")
+}
+
+model Audit {
+  id        String  @id
+  userId    String
+  action    String
+  targetId  String?
+  detail    String
+  createdAt String
+
+  @@index([userId, createdAt])
+  @@map("audit")
+}
+
+model UsedVerificationToken {
+  hash       String @id
+  consumedAt String
+
+  @@map("used_verification_tokens")
+}
+
+model Job {
+  name        String  @id
+  lastSuccess String?
+  lastError   String?
+
+  @@map("jobs")
+}
+
+model AssetShare {
+  id        String        @id
+  inviterId String
+  inviter   User          @relation("Inviter", fields: [inviterId], references: [id])
+  inviteeId String
+  invitee   User          @relation("Invitee", fields: [inviteeId], references: [id])
+  pairKey   String
+  status    String        @default("pending")
+  createdAt String
+  expiresAt String
+  updatedAt String
+  wallets   ShareWallet[]
+
+  @@index([inviterId, inviteeId, status])
+  @@index([pairKey])
+  @@map("asset_shares")
+}
+
+model ShareWallet {
+  shareId  String
+  share    AssetShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User       @relation(fields: [userId], references: [id])
+  walletId String
+  wallet   Wallet     @relation(fields: [walletId], references: [id])
+
+  @@id([shareId, userId, walletId])
+  @@map("share_wallets")
+}
+
+model McpToken {
+  id         String  @id
+  userId     String
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  tokenHash  String  @unique
+  prefix     String
+  scopes     String
+  createdAt  String
+  expiresAt  String
+  revokedAt  String?
+  lastUsedAt String?
+
+  @@index([userId])
+  @@map("mcp_tokens")
+}
+
+model Mutation {
+  userId String
+  key    String
+  result String
+
+  @@id([userId, key])
+  @@map("mutations")
+}

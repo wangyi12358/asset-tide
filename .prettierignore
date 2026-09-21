@@ -1,0 +1,7 @@
+node_modules
+.next
+pnpm-lock.yaml
+data
+backups
+PRD.md
+docs/screenshots
