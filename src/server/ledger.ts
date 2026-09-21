@@ -12,6 +12,7 @@ import {
 } from "./valuation";
 import { getDb, now, uid, transaction } from "./db";
 import { fundQuote } from "./funds";
+import { goldQuote, supportsGoldQuote } from "./gold";
 import type { LedgerEvent, Leg, Wallet } from "@/lib/types";
 export class DomainError extends Error {
   constructor(
@@ -113,24 +114,28 @@ export async function recordEvent(
       return w;
     };
     await getWallet(input.accountId);
-    let automaticFundQuote: Awaited<ReturnType<typeof fundQuote>> | undefined;
+    let automaticQuote: Awaited<ReturnType<typeof goldQuote>> | undefined;
+    const automaticFund =
+      asset.type === "fund" && asset.currency === "CNY" && !!asset.providerId;
     if (
       input.price === undefined &&
-      asset.type === "fund" &&
-      asset.currency === "CNY" &&
-      asset.providerId &&
+      (automaticFund || supportsGoldQuote(asset)) &&
       ["deposit", "withdrawal", "adjustment"].includes(input.type)
     ) {
-      // A newly fetched NAV can value a current movement, never a historical one.
+      // Current quotes must never be used to backfill historical movements.
       if (replacing || Date.now() - Date.parse(at) > 5 * 60_000)
         throw new DomainError(
-          "历史基金流水请填写发生时净值，不能使用当前净值回填",
+          automaticFund
+            ? "历史基金流水请填写发生时净值，不能使用当前净值回填"
+            : "历史黄金流水请填写发生时金价，不能使用当前金价回填",
         );
       try {
-        automaticFundQuote = await fundQuote(asset.providerId);
+        automaticQuote = automaticFund
+          ? await fundQuote(asset.providerId!)
+          : await goldQuote(asset);
       } catch (error) {
         throw new DomainError(
-          `未能自动获取基金净值：${error instanceof Error ? error.message : "服务暂不可用"}。请重试或填写手动参考价`,
+          `未能自动获取${automaticFund ? "基金净值" : "黄金价格"}：${error instanceof Error ? error.message : "服务暂不可用"}。请重试或填写手动参考价`,
         );
       }
     }
@@ -166,11 +171,9 @@ export async function recordEvent(
     const cashId = `cash-${asset.currency.toLowerCase()}`;
     const requiredValue = () => {
       const price =
-        asset.type === "cash"
-          ? "1"
-          : (input.price ?? automaticFundQuote?.value);
+        asset.type === "cash" ? "1" : (input.price ?? automaticQuote?.value);
       const fx = asset.currency === "CNY" ? "1" : input.fx;
-      const needsNote = !automaticFundQuote || input.type === "adjustment";
+      const needsNote = !automaticQuote || input.type === "adjustment";
       if (price === undefined || !fx || (needsNote && !input.note.trim()))
         throw new DomainError(
           "外部流入/修正需要发生时价格、汇率和估值依据备注",
@@ -294,10 +297,10 @@ export async function recordEvent(
         type: input.type,
         occurredAt: at,
         createdAt: now(),
-        note: automaticFundQuote
+        note: automaticQuote
           ? [
               input.note,
-              `估值依据：${automaticFundQuote.source}，${automaticFundQuote.value} CNY/份`,
+              `估值依据：${automaticQuote.source}，${automaticQuote.value} ${asset.currency}/${asset.quoteBasis === "oz" ? "金衡盎司" : asset.unit}`,
             ]
               .filter(Boolean)
               .join("；")
@@ -320,15 +323,15 @@ export async function recordEvent(
         },
       });
     await assertTimeline(userId);
-    if (automaticFundQuote)
+    if (automaticQuote)
       await getDb().price.create({
         data: {
           id: uid(),
           instrumentId: asset.id,
           userId: asset.ownerId,
-          value: automaticFundQuote.value,
-          asOf: automaticFundQuote.asOf,
-          source: automaticFundQuote.source,
+          value: automaticQuote.value,
+          asOf: automaticQuote.asOf,
+          source: automaticQuote.source,
           manual: 0,
           createdAt: now(),
         },

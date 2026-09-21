@@ -122,3 +122,124 @@ test("physical gold refresh values pure weight, preserves manual prices, and ret
   t.mock.timers.tick(3600_001);
   assert.equal((await holdings(userId))[0].status, "stale");
 });
+
+test("current gold movements use API prices when the manual reference is omitted", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() + 86400_000 });
+  const userId = uid();
+  const instrumentId = uid();
+  await getDb().user.create({
+    data: {
+      id: userId,
+      name: "Automatic gold",
+      email: `${userId}@example.test`,
+    },
+  });
+  await ensureProfile(userId);
+  await getDb().profile.update({
+    where: { userId },
+    data: {
+      initialized: 1,
+      baseline: "0",
+      baselineAt: new Date(Date.now() - 86400_000).toISOString(),
+    },
+  });
+  await getDb().instrument.create({
+    data: {
+      ...catalog.find((i) => i.id === "gold-au9999")!,
+      id: instrumentId,
+      ownerId: userId,
+    },
+  });
+  let calls = 0;
+  let failing = false;
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    assert.equal(url, "https://api.gold-api.com/price/XAU/CNY");
+    calls++;
+    return failing
+      ? Response.json({}, { status: 503 })
+      : Response.json({
+          symbol: "XAU",
+          currency: "CNY",
+          price: 31103.4768,
+          updatedAt: new Date(Date.now() - 1000).toISOString(),
+        });
+  });
+  const input = eventSchema.parse({
+    type: "deposit",
+    accountId: (await wallets(userId))[0].id,
+    instrumentId,
+    quantity: "100",
+    occurredAt: new Date().toISOString(),
+  });
+  const key = uid();
+  const saved = await recordEvent(userId, input, key);
+  assert.equal(saved.externalCny, "99990", "purity is applied exactly once");
+  assert.match(saved.note, /估值依据：Gold API.*1000 CNY\/克/);
+  assert.equal(JSON.parse(saved.payload).price, undefined);
+  const prices = await getDb().price.findMany({ where: { instrumentId } });
+  assert.equal(prices.length, 1);
+  assert.equal(prices[0].manual, 0);
+  assert.equal(prices[0].userId, userId, "custom gold quotes remain private");
+  assert.equal((await recordEvent(userId, input, key)).id, saved.id);
+  assert.equal(calls, 1);
+  const withdrawal = await recordEvent(
+    userId,
+    { ...input, type: "withdrawal", quantity: "10" },
+    uid(),
+  );
+  assert.equal(withdrawal.externalCny, "-9999");
+  await assert.rejects(
+    recordEvent(userId, { ...input, type: "adjustment" }, uid()),
+    /估值依据备注/,
+  );
+  const adjustment = await recordEvent(
+    userId,
+    { ...input, type: "adjustment", quantity: "10", note: "重量修正" },
+    uid(),
+  );
+  assert.equal(adjustment.baselineAdjustment, "9999");
+  assert.equal((await holdings(userId))[0].value, "99990");
+  for (const type of ["buy", "sell"] as const)
+    await assert.rejects(
+      recordEvent(userId, { ...input, type }, uid()),
+      /实际成交单价/,
+    );
+  await assert.rejects(
+    recordEvent(
+      userId,
+      { ...input, occurredAt: new Date(Date.now() - 3600_000).toISOString() },
+      uid(),
+    ),
+    /历史黄金流水/,
+  );
+  await assert.rejects(
+    recordEvent(userId, input, uid(), saved.id),
+    /历史黄金流水/,
+  );
+  assert.equal(calls, 1, "historical entries never fetch current prices");
+  t.mock.timers.tick(60_001);
+  failing = true;
+  const retryKey = uid();
+  await assert.rejects(
+    recordEvent(userId, input, retryKey),
+    /未能自动获取黄金价格/,
+  );
+  assert.equal(await getDb().ledgerEvent.count({ where: { userId } }), 3);
+  failing = false;
+  assert.equal(
+    (await recordEvent(userId, input, retryKey)).externalCny,
+    "99990",
+  );
+  const beforeManual = calls;
+  const manual = await recordEvent(
+    userId,
+    { ...input, price: "900", note: "回收报价" },
+    uid(),
+  );
+  assert.equal(manual.externalCny, "89991");
+  assert.equal(calls, beforeManual);
+  assert.equal(
+    await getDb().price.count({ where: { instrumentId, userId, manual: 1 } }),
+    1,
+  );
+});

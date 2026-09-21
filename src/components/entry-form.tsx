@@ -226,12 +226,21 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
     !edit &&
     !dateChanged &&
     needsValue;
+  const automaticGoldValue =
+    item?.type === "gold" &&
+    item.unit === "克" &&
+    ["unit", "oz"].includes(item.quoteBasis) &&
+    ["CNY", "USD", "HKD"].includes(item.currency) &&
+    !edit &&
+    !dateChanged &&
+    needsValue;
+  const automaticValue = automaticFundValue || automaticGoldValue;
   const needPrice =
     item?.type !== "cash" &&
-    ((needsValue && !automaticFundValue) ||
+    ((needsValue && !automaticValue) ||
       ["buy", "sell", "split"].includes(type));
   const needNote =
-    (needsValue && (!automaticFundValue || !!price)) ||
+    (needsValue && (!automaticValue || !!price)) ||
     ["split", "adjustment"].includes(type);
   const filtered = instruments?.filter(
     (i) =>
@@ -486,14 +495,18 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
               placeholder={
                 automaticFundValue
                   ? "留空，保存时自动获取已公布净值"
-                  : needPrice
-                    ? "填写发生时价格"
-                    : "可留空，保存后刷新报价"
+                  : automaticGoldValue
+                    ? "留空，保存时自动获取参考金价"
+                    : needPrice
+                      ? "填写发生时价格"
+                      : "可留空，保存后刷新报价"
               }
               hint={
                 automaticFundValue
                   ? "默认使用天天基金已公布净值，并自动记录估值依据。填写此项会改用手动报价。"
-                  : "填写后作为私有手动报价生效；可在资产详情主动切回自动行情。"
+                  : automaticGoldValue
+                    ? "默认使用 Gold API 参考金价，并自动记录估值依据。填写此项会改用手动报价。"
+                    : "填写后作为私有手动报价生效；可在资产详情主动切回自动行情。"
               }
             />
           )}
