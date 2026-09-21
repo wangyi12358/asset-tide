@@ -11,6 +11,7 @@ import {
   valuation,
 } from "./valuation";
 import { getDb, now, uid, transaction } from "./db";
+import { fundQuote } from "./funds";
 import type { LedgerEvent, Leg, Wallet } from "@/lib/types";
 export class DomainError extends Error {
   constructor(
@@ -112,6 +113,27 @@ export async function recordEvent(
       return w;
     };
     await getWallet(input.accountId);
+    let automaticFundQuote: Awaited<ReturnType<typeof fundQuote>> | undefined;
+    if (
+      input.price === undefined &&
+      asset.type === "fund" &&
+      asset.currency === "CNY" &&
+      asset.providerId &&
+      ["deposit", "withdrawal", "adjustment"].includes(input.type)
+    ) {
+      // A newly fetched NAV can value a current movement, never a historical one.
+      if (replacing || Date.now() - Date.parse(at) > 5 * 60_000)
+        throw new DomainError(
+          "历史基金流水请填写发生时净值，不能使用当前净值回填",
+        );
+      try {
+        automaticFundQuote = await fundQuote(asset.providerId);
+      } catch (error) {
+        throw new DomainError(
+          `未能自动获取基金净值：${error instanceof Error ? error.message : "服务暂不可用"}。请重试或填写手动参考价`,
+        );
+      }
+    }
     if (replacing) {
       const old = (await getDb().ledgerEvent.findFirst({
         where: { id: replacing, userId: userId, status: "active" },
@@ -143,9 +165,13 @@ export async function recordEvent(
     const fee = D(input.fee);
     const cashId = `cash-${asset.currency.toLowerCase()}`;
     const requiredValue = () => {
-      const price = asset.type === "cash" ? "1" : input.price;
+      const price =
+        asset.type === "cash"
+          ? "1"
+          : (input.price ?? automaticFundQuote?.value);
       const fx = asset.currency === "CNY" ? "1" : input.fx;
-      if (price === undefined || !fx || !input.note.trim())
+      const needsNote = !automaticFundQuote || input.type === "adjustment";
+      if (price === undefined || !fx || (needsNote && !input.note.trim()))
         throw new DomainError(
           "外部流入/修正需要发生时价格、汇率和估值依据备注",
         );
@@ -268,7 +294,14 @@ export async function recordEvent(
         type: input.type,
         occurredAt: at,
         createdAt: now(),
-        note: input.note,
+        note: automaticFundQuote
+          ? [
+              input.note,
+              `估值依据：${automaticFundQuote.source}，${automaticFundQuote.value} CNY/份`,
+            ]
+              .filter(Boolean)
+              .join("；")
+          : input.note,
         externalCny: external,
         baselineAdjustment: adjustment,
         idempotencyKey: key,
@@ -287,6 +320,19 @@ export async function recordEvent(
         },
       });
     await assertTimeline(userId);
+    if (automaticFundQuote)
+      await getDb().price.create({
+        data: {
+          id: uid(),
+          instrumentId: asset.id,
+          userId: asset.ownerId,
+          value: automaticFundQuote.value,
+          asOf: automaticFundQuote.asOf,
+          source: automaticFundQuote.source,
+          manual: 0,
+          createdAt: now(),
+        },
+      });
     if (input.price !== undefined && asset.type !== "cash")
       await getDb().price.create({
         data: {

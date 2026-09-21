@@ -219,9 +219,20 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
       </Notice>
     );
   const needsValue = ["deposit", "withdrawal", "adjustment"].includes(type);
+  const automaticFundValue =
+    item?.type === "fund" &&
+    item.currency === "CNY" &&
+    !!item.providerId &&
+    !edit &&
+    !dateChanged &&
+    needsValue;
   const needPrice =
     item?.type !== "cash" &&
-    (needsValue || ["buy", "sell", "split"].includes(type));
+    ((needsValue && !automaticFundValue) ||
+      ["buy", "sell", "split"].includes(type));
+  const needNote =
+    (needsValue && (!automaticFundValue || !!price)) ||
+    ["split", "adjustment"].includes(type);
   const filtered = instruments?.filter(
     (i) =>
       i.id === instrumentId ||
@@ -467,15 +478,23 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
           )}
           {item && item.type !== "cash" && (
             <Field
-              label={`${["buy", "sell"].includes(type) ? "实际成交单价" : type === "split" ? "变更后参考单价" : "手动参考价"}（${item?.currency || "原币"}/${item?.quoteBasis === "oz" ? "金衡盎司" : item?.unit || "单位"}）`}
+              label={`${["buy", "sell"].includes(type) ? "实际成交单价" : type === "split" ? "变更后参考单价" : "手动参考价"}（${item?.currency || "原币"}/${item?.quoteBasis === "oz" ? "金衡盎司" : item?.unit || "单位"}${needPrice ? "" : "，选填"}）`}
               required={needPrice}
               inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder={
-                needPrice ? "填写发生时价格" : "可留空，稍后刷新或补充报价"
+                automaticFundValue
+                  ? "留空，保存时自动获取已公布净值"
+                  : needPrice
+                    ? "填写发生时价格"
+                    : "可留空，保存后刷新报价"
               }
-              hint="填写后作为私有手动报价生效；可在资产详情主动切回自动行情。"
+              hint={
+                automaticFundValue
+                  ? "默认使用天天基金已公布净值，并自动记录估值依据。填写此项会改用手动报价。"
+                  : "填写后作为私有手动报价生效；可在资产详情主动切回自动行情。"
+              }
             />
           )}
           {item && item.currency !== "CNY" && (
@@ -555,15 +574,13 @@ export function EntryForm({ asset = false }: { asset?: boolean }) {
           />
           <label className="field">
             <span>
-              {needsValue || ["split", "adjustment"].includes(type)
-                ? "估值依据 / 变更原因（必填）"
-                : "备注 / 价格来源"}
+              {needNote ? "估值依据 / 变更原因（必填）" : "备注 / 价格来源"}
             </span>
             <textarea
               className="field-input"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              required={needsValue || type === "split"}
+              required={needNote}
               maxLength={1000}
               placeholder="例如：银行结汇回单、券商成交记录、持仓调整原因…"
               rows={3}
